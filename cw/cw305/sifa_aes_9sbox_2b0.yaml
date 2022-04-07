@@ -1,0 +1,24 @@
+device:
+  fpga_bitstream: objs/lowrisc_systems_chip_earlgrey_cw310_0.1_sifa.bit
+  fw_bin: objs/aes_serial_fpga_cw310_sifa.bin
+  pll_frequency: 100000000
+  baudrate: 115200
+capture:
+  # Only AES-128 ECB is supported at this moment.
+  key_len_bytes: 16
+  plain_text_len_bytes: 16
+  output_len_bytes: 16
+  # Samples per trace - We oversample by 10x and AES with DOM is doing
+  # ~56/72 cycles per encryption (AES-128/256).
+  num_samples: 740
+  scope_gain: 32.5
+  num_traces: 100
+  project_name: projects/sifa_aes_9sbox_2b0
+  waverunner_ip: 192.168.1.228
+  batch_prng_seed: 0
+plot_capture:
+  show: true
+  num_traces: 50
+  trace_image_filename: projects/sample_traces_aes.html
+  # The ADC output is in the interval [-0.5, 0.5). Define safety margin.
+  amplitude_max: 0.48
