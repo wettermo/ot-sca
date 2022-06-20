@@ -1,5 +1,5 @@
 device:
-  fpga_bitstream: objs/lowrisc_systems_chip_earlgrey_cw310_0.1_dom_sifa.bit
+  fpga_bitstream: objs/lowrisc_systems_chip_earlgrey_cw310_0.1_dom_st1_sifa.bit
   fw_bin: objs/aes_serial_fpga_cw310_sifa.bin
   pll_frequency: 100000000
   baudrate: 115200
@@ -13,7 +13,7 @@ capture:
   num_samples: 740
   scope_gain: 32.5
   num_traces: 5000
-  project_name: projects/sifa_aes_9sbox_dom
+  project_name: projects/sifa_aes_9sbox_dom_st1
   waverunner_ip: 192.168.1.228
   batch_prng_seed: 0
 plot_capture:

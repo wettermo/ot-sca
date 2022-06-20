@@ -21,7 +21,7 @@ attacked_key_byte_index = attackable_key_byte_index[0] #[0,1,2,3]
 
 # ==== get data from external measurement ==== #
 #project_file = "projects/sifa_aes_9sbox_2b0"
-project_file = "projects/sifa_aes_9sbox_dom"
+project_file = "projects/sifa_aes_9sbox_dom_st1"
 project = cw.open_project(project_file)
 
 numb_ciphertexts = 3500
