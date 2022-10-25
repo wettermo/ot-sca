@@ -40,7 +40,7 @@ attacked_key_byte_index = attackable_key_byte_index[0] #[0,1,2,3]
 project_file = "projects/sifa_aes_9sbox_2b0"
 project = cw.open_project(project_file)
 
-numb_ciphertexts = 1000
+numb_ciphertexts = 100
 known_key = project.keys[0]
 ineff_ciphertexts = project.textouts[0:numb_ciphertexts]
 ineff_plaintexts = project.textins[0:numb_ciphertexts]
