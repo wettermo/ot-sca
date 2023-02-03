@@ -1079,14 +1079,19 @@ def capture_otbn_vertical(ot, ktp, fw_bin, pll_frequency, capture_cfg):
 
         ot.scope.adc.offset = capture_cfg["offset"]
 
-        # Generate a new random mask for each trace.
-        mask = ktp.next_text()
-        tqdm.write(f'mask = {mask.hex()}')
+        if capture_cfg["masks_off"] is True:
+            # Use a constant mask for each trace
+            mask = bytearray(capture_cfg["plain_text_len_bytes"])  # all zeros
+        else:
+            # Generate a new random mask for each trace.
+            mask = ktp.next_text()
+        tqdm.write("Starting new trace....")
+        tqdm.write(f'mask   = {mask.hex()}')
 
         if sample_fixed:
             # Set the seed.
             ot.target.simpleserial_write('x', seed_fixed)
-            tqdm.write(f'seed = {seed_fixed.hex()}')
+            tqdm.write(f'seed   = {seed_fixed.hex()}')
 
             # Check for errors.
             err = ot.target.read()
@@ -1125,7 +1130,7 @@ def capture_otbn_vertical(ot, ktp, fw_bin, pll_frequency, capture_cfg):
             # Set the seed.
             seed = ktp.next_key()
             ot.target.simpleserial_write('x', seed)
-            tqdm.write(f'seed = {seed.hex()}')
+            tqdm.write(f'seed   = {seed.hex()}')
 
             # Check for errors.
             err = ot.target.read()
@@ -1161,6 +1166,9 @@ def capture_otbn_vertical(ot, ktp, fw_bin, pll_frequency, capture_cfg):
             expected_key = int.from_bytes(seed, byteorder='little') % curve_order_n
             seedout = seed
 
+        tqdm.write(f'share0 = {share0.hex()}')
+        tqdm.write(f'share1 = {share1.hex()}')
+
         sample_fixed = random.randint(0, 1)
         if actual_key != expected_key:
             raise RuntimeError('Bad generated key:\n'
@@ -1169,7 +1177,7 @@ def capture_otbn_vertical(ot, ktp, fw_bin, pll_frequency, capture_cfg):
 
         # Create a chipwhisperer trace object and save it to the project
         # Args/fields of Trace object: waves, textin, textout, key
-        textout = share0 + share1
+        textout = share0 + share1  # concardinate bytearrays
         trace = Trace(waves, mask, textout, seedout)
         check_range(waves, ot.scope.adc.bits_per_sample)
         project.traces.append(trace, dtype=np.uint16)
