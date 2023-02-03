@@ -454,6 +454,27 @@ def run_tvla(ctx: typer.Context):
         # Amount of tolerable deviation from average during filtering.
         num_sigmas = 3.5
 
+        # Slice of wave file
+        # these options are only tested for otbn
+        if (cfg["mode"] != "otbn" or cfg["sample_start"] is None):
+            sample_start = 0
+        else:
+            sample_start = cfg["sample_start"]
+
+        assert sample_start < len(project.waves[0])
+
+        if (cfg["mode"] != "otbn" or cfg["num_samples"] is None):
+            num_samples = len(project.waves[0]) - sample_start
+        else:
+            num_samples = cfg["num_samples"]
+
+        if (num_samples + sample_start > len(project.waves[0])):
+            log.warning(f"Selected sample window {sample_start} to " +
+                        f"{sample_start+num_samples} is out of range!")
+            num_samples = len(project.waves[0]) - sample_start
+            log.warning(f"Will use samples from {sample_start} " +
+                        f"to {sample_start+num_samples} instead!")
+
         # Overall number of traces, trace start and end indices.
         num_traces_tot = len(project.waves)
         if cfg["trace_start"] is None:
@@ -514,9 +535,12 @@ def run_tvla(ctx: typer.Context):
                 log.info("Converting Traces")
                 if project.waves[0].dtype == 'uint16':
                     traces = np.empty((num_traces, num_samples), dtype=np.uint16)
+                    log.info(f"Will use samples from {sample_start} to {sample_start+num_samples}")
                     for i_trace in range(num_traces):
-                        traces[i_trace] = project.waves[i_trace + trace_start]
-                else:
+                        traces[i_trace] = project.waves[i_trace +
+                                                        trace_start][sample_start:sample_start +
+                                                                     num_samples]
+                else:  # FIXME: The wave slicing is only tested for otbn
                     traces = np.empty((num_traces, num_samples), dtype=np.double)
                     for i_trace in range(num_traces):
                         traces[i_trace] = (project.waves[i_trace +
