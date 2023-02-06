@@ -4,8 +4,11 @@
 # SPDX-License-Identifier: Apache-2.0
 import binascii
 import random
+import signal
+import sys
 import time
 from enum import Enum
+from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -58,6 +61,16 @@ SCOPE_FACTORY = {
     ScopeType.cw: create_cw_segmented,
     ScopeType.waverunner: create_waverunner,
 }
+
+
+def abort_handler(project, sig, frame):
+    """ Handler for ctrl-c keyboard interrupts:
+        Saves capture project before exiting, in case abort is intended.
+        Needs to be registered in every capture function before capture loop. """
+    if project is not None:
+        print("caught keyboard interrupt -> saving project (traces)...")
+        project.save()
+    sys.exit(0)
 
 
 # Note: initialize_capture and plot_results are also used by other scripts.
@@ -1068,6 +1081,9 @@ def capture_otbn_vertical(ot, ktp, fw_bin, pll_frequency, capture_cfg):
     # Expected key is `seed mod n`, where n is the order of the curve and
     # `seed` is interpreted as little-endian.
     expected_fixed_key = int.from_bytes(seed_fixed, byteorder='little') % curve_order_n
+
+    # register ctrl-c handler to not lose already recorded traces if measurement is aborted
+    signal.signal(signal.SIGINT, partial(abort_handler, project))
 
     sample_fixed = 1
     # Loop to collect each power trace
