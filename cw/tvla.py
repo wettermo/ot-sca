@@ -883,12 +883,16 @@ def run_tvla(ctx: typer.Context):
         else:
             #
             c = np.ones(num_samples)
+            xaxs = range(sample_start, sample_start + num_samples)
             fig, axs = plt.subplots(3, sharex=True)
-            axs[0].plot(single_trace, "k")
+            axs[0].set_title(
+                "TVLA of " + cfg["project_file"] + '\n' + "No. of traces: " + str(num_traces))
+            axs[0].plot(xaxs, single_trace, "k")
+            axs[0].set_ylabel("trace")
             for i_order in range(num_orders):
-                axs[1 + i_order].plot(ttest_trace[i_order, 0, 0], "k")
-                axs[1 + i_order].plot(c * threshold, "r")
-                axs[1 + i_order].plot(-threshold * c, "r")
+                axs[1 + i_order].plot(xaxs, ttest_trace[i_order, 0, 0], "k")
+                axs[1 + i_order].plot(xaxs, c * threshold, "r")
+                axs[1 + i_order].plot(xaxs, -threshold * c, "r")
                 axs[1 + i_order].set_ylabel('t-test ' + str(i_order + 1))
             plt.xlabel("time [samples]")
             plt.savefig('tmp/figures/' + cfg["mode"] + '_fixed_vs_random.png')
