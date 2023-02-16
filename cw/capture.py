@@ -1053,6 +1053,14 @@ def capture_otbn_vertical(ot, ktp, fw_bin, pll_frequency, capture_cfg):
     # Create a cw project to keep the data and traces
     project = cw.create_project(capture_cfg["project_name"], overwrite=True)
 
+    # Save metadata to project file
+    project.settingsDict['pll_frequency'] = pll_frequency
+    project.settingsDict['masks_off'] = capture_cfg["masks_off"]
+    project.settingsDict['num_samples'] = capture_cfg["num_samples"]
+    project.settingsDict['offset'] = capture_cfg["offset"]
+    project.settingsDict['scope_gain'] = capture_cfg["scope_gain"]
+    project.settingsDict['num_traces'] = capture_cfg["num_traces"]
+
     # Initialize some curve-dependent parameters.
     if capture_cfg["curve"] == 'p256':
         curve_order_n = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
@@ -1198,6 +1206,8 @@ def capture_otbn_vertical(ot, ktp, fw_bin, pll_frequency, capture_cfg):
         check_range(waves, ot.scope.adc.bits_per_sample)
         project.traces.append(trace, dtype=np.uint16)
 
+    # store last number of cycles where the trigger signal was high to metadata
+    project.settingsDict['samples_trigger_high'] = cycles
     project.save()
 
 

@@ -855,6 +855,19 @@ def run_tvla(ctx: typer.Context):
         log.info("Plotting Figures to tmp/figures")
         Path("tmp/figures").mkdir(exist_ok=True)
 
+        # Catch case where metadata isn't saved to project file (e.g. older measurements)
+        metadata = True
+        try:
+            textbox = '\n \n'.join([
+                "PLL:\n" + project.config['ChipWhisperer']['General Settings']['pll_frequency'],
+                "Masks off:\n" + project.config['ChipWhisperer']['General Settings']['masks_off'],
+                "Samples:\n" + project.config['ChipWhisperer']['General Settings']['num_samples'],
+                "Offset:\n" + project.config['ChipWhisperer']['General Settings']['offset'],
+                "Scope gain:\n" + project.config['ChipWhisperer']['General Settings']['scope_gain'],
+                "Traces:\n" + project.config['ChipWhisperer']['General Settings']['num_traces']])
+        except:
+            metadata = False
+
         # Plotting figures for t-test statistics vs. time.
         log.info("Plotting T-test Statistics vs. Time.")
         if cfg["mode"] == "aes" and general_test is False:
@@ -881,19 +894,33 @@ def run_tvla(ctx: typer.Context):
                     else:
                         plt.close()
         else:
-            #
             c = np.ones(num_samples)
             xaxs = range(sample_start, sample_start + num_samples)
             fig, axs = plt.subplots(3, sharex=True)
-            axs[0].set_title(
-                "TVLA of " + cfg["project_file"] + '\n' + "No. of traces: " + str(num_traces))
-            axs[0].plot(xaxs, single_trace, "k")
+            axs[0].set_title("TVLA of " + cfg["project_file"])
+            if metadata:
+                offset = int(project.config['ChipWhisperer']['General Settings']['offset'])
+                trigger_samples = int(
+                    project.config['ChipWhisperer']['General Settings']['samples_trigger_high'])
+                trigger_high = trigger_samples - offset - sample_start
+                if trigger_high < 0:
+                    trigger_high = 0
+                axs[0].plot(xaxs[:trigger_high], single_trace[:trigger_high], "k", label='trigger high')
+                axs[0].plot(xaxs[trigger_high:], single_trace[trigger_high:], "dimgrey", label='trigger low')
+                axs[0].legend(loc='upper right', prop={'size': 7})
+            else:
+                axs[0].plot(xaxs, single_trace, "k")
             axs[0].set_ylabel("trace")
             for i_order in range(num_orders):
                 axs[1 + i_order].plot(xaxs, ttest_trace[i_order, 0, 0], "k")
                 axs[1 + i_order].plot(xaxs, c * threshold, "r")
                 axs[1 + i_order].plot(xaxs, -threshold * c, "r")
                 axs[1 + i_order].set_ylabel('t-test ' + str(i_order + 1))
+            if metadata:
+                plt.gcf().text(
+                    0.86, 0.25, textbox, fontsize=9,
+                    bbox = dict(boxstyle='round', facecolor='w', linewidth=0.6))
+                plt.subplots_adjust(right=0.84)
             plt.xlabel("time [samples]")
             plt.savefig('tmp/figures/' + cfg["mode"] + '_fixed_vs_random.png')
             plt.show()
@@ -904,7 +931,7 @@ def run_tvla(ctx: typer.Context):
         if num_steps > 1:
 
             log.info("Plotting T-test Statistics vs. Number of Traces, this may take a while.")
-            xticks = [np.around(trace_end / 100000) for trace_end in trace_end_vec]
+            xticks = [np.around(trace_end) for trace_end in trace_end_vec]
             xticklabels = [str(int(tick)) for tick in xticks]
 
             # Empty every second label if we got more than 10 steps.
@@ -941,6 +968,9 @@ def run_tvla(ctx: typer.Context):
                     if cfg["mode"] == "aes":
                         # Simply plot everything.
                         samples = range(0, num_samples)
+                    elif cfg["mode"] == "otbn":
+                        # For now let's focus on the ecc256 keygen part
+                        samples = range (700, 1800)
                     else:
                         # For now, let's focus on the key absorption only.
                         samples = range(520, 2460)
@@ -956,7 +986,7 @@ def run_tvla(ctx: typer.Context):
                                               'k')
                             axs[i_order].plot(c * threshold, 'r')
                             axs[i_order].plot(-threshold * c, 'r')
-                            axs[i_order].set_xlabel('number of traces [100k]')
+                            axs[i_order].set_xlabel('number of traces')
                             axs[i_order].set_xticks(range(num_steps))
                             axs[i_order].set_xticklabels(xticklabels)
                             axs[i_order].set_ylabel('t-test ' + str(i_order + 1) +
