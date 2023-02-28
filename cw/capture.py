@@ -1294,12 +1294,19 @@ def capture_otbn_vertical_batch(ot, ktp, capture_cfg, scope_type):
     if len(seed_fixed) != seed_bytes:
         raise ValueError(f'Fixed seed length is {len(seed_fixed)}, expected {seed_bytes}')
     ot.target.simpleserial_write("x", seed_fixed)
-    time.sleep(2.5)
+    time.sleep(1)
 
     # set PRNG seed
     random.seed(capture_cfg["batch_prng_seed"])
     ot.target.simpleserial_write("s", capture_cfg["batch_prng_seed"].to_bytes(4, "little"))
-    time.sleep(2.5)
+    time.sleep(1)
+
+    # enable/disable masking
+    if capture_cfg["masks_off"] == True:
+        ot.target.simpleserial_write("m", bytearray([0x00]))
+    else:
+        ot.target.simpleserial_write("m", bytearray([0x01]))
+    time.sleep(1)
 
     # Create the ChipWhisperer project.
     project = cw.create_project(capture_cfg["project_name"], overwrite=True)
@@ -1328,7 +1335,6 @@ def capture_otbn_vertical_batch(ot, ktp, capture_cfg, scope_type):
             # Determine the number of traces for this batch and arm the oscilloscope.
             scope.num_segments = min(rem_num_traces, scope.num_segments_max)
 
-            #time.sleep(2.5)
             scope.arm()
             # Start batch keygen
             ot.target.simpleserial_write(
@@ -1351,8 +1357,10 @@ def capture_otbn_vertical_batch(ot, ktp, capture_cfg, scope_type):
                 else:
                     seed = int.from_bytes(ktp.next()[1], "little")
                 
-                mask = int.from_bytes(ktp.next()[1], "little")
-                #mask = int.from_bytes(bytearray(capture_cfg["plain_text_len_bytes"]), "little")  # all zeros
+                if capture_cfg["masks_off"] == True:
+                    mask = int.from_bytes(bytearray(capture_cfg["plain_text_len_bytes"]), "little")
+                else:
+                    mask = int.from_bytes(ktp.next()[1], "little")
                 masks.append(mask.to_bytes(seed_bytes, "little"))
                 seed = seed ^ mask
 
