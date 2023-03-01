@@ -13,17 +13,17 @@ capture:
   use_fixed_key_iter: False # See https://github.com/lowRISC/ot-sca/issues/116
   key_len_bytes: 40
   plain_text_len_bytes: 40
-  masks_off: true
+  masks_off: false
   # Output length (most likely unused).
   output_len_bytes: 40
   # Samples per trace
   # Fifo Size is 131070 = max num samples to avoid multiple runs per trace
-  num_samples: 5000 # 6000 cycles*20 sampling points
+  num_samples: 3500 # 6000 cycles*20 sampling points
   # Offset in samples
   offset: 0
-  # scope gain in db - 13 for non-stream mode, 32.5 for stream mode
-  scope_gain: 15
-  num_traces: 6
+  # scope gain in db
+  scope_gain: 20
+  num_traces: 10000
   # PRNG seed for batch mode
   batch_prng_seed: 6
   project_name: projects/opentitan_otbn_vertical_keygen

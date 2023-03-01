@@ -1250,8 +1250,8 @@ def capture_otbn_vertical_batch(ot, ktp, capture_cfg, scope_type):
     """A generator for fast capturing otbn vertical (ecc256 keygen) traces.
     The data collection method is based on the derived test requirements (DTR) for TVLA:
     https://www.rambus.com/wp-content/uploads/2015/08/TVLA-DTR-with-AES.pdf
-    The measurements are taken by using either fixed or randomly selected message.
-    In order to simplify the analysis, the first sample has to use fixed message.
+    The measurements are taken by using either fixed or randomly selected seed.
+    In order to simplify the analysis, the first sample has to use fixed seed.
 
     Args:
       ot: Initialized OpenTitan target.
@@ -1297,35 +1297,30 @@ def capture_otbn_vertical_batch(ot, ktp, capture_cfg, scope_type):
 
     # set ecc256 fixed seed - for batch mode the "plaintext" of ktp is used for seed and mask
     # this simplifies synchronization with the device PRNG
-    #seed_fixed = ktp.next()[1]
-    seed_fixed = bytearray([0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-                            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-                            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+    seed_fixed = ktp.next()[1]
     print("Fixed seed:")
     print(binascii.b2a_hex(seed_fixed))
     if len(seed_fixed) != seed_bytes:
         raise ValueError(f'Fixed seed length is {len(seed_fixed)}, expected {seed_bytes}')
     ot.target.simpleserial_write("x", seed_fixed)
-    time.sleep(0.5)
+    time.sleep(0.3)
 
     # set PRNG seed
     random.seed(capture_cfg["batch_prng_seed"])
     ot.target.simpleserial_write("s", capture_cfg["batch_prng_seed"].to_bytes(4, "little"))
-    time.sleep(0.5)
+    time.sleep(0.3)
 
     # enable/disable masking
     if capture_cfg["masks_off"] == True:
         ot.target.simpleserial_write("m", bytearray([0x00]))
     else:
         ot.target.simpleserial_write("m", bytearray([0x01]))
-    time.sleep(0.5)
+    time.sleep(0.3)
 
     # Capture traces.
     rem_num_traces = capture_cfg["num_traces"]
     num_segments_storage = 1
-    sample_fixed = False
+    sample_fixed = True
 
     # cw and waverunner scopes are supported fot batch capture.
     scope = SCOPE_FACTORY[scope_type](ot, capture_cfg)
@@ -1339,7 +1334,9 @@ def capture_otbn_vertical_batch(ot, ktp, capture_cfg, scope_type):
         scope._scope.clock.adc_mul = capture_cfg["adc_mul"]
     if "decimate" in capture_cfg:
         scope._scope.adc.decimate = capture_cfg["decimate"]
-    #scope._scope.clock.clkgen_freq = 50000000
+
+    # Print final scope parameter
+    print(f'Scope setup with final sampling rate of {scope._scope.clock.adc_freq} S/s')
 
     with tqdm(total=rem_num_traces, desc="Capturing", ncols=80, unit=" traces") as pbar:
         while rem_num_traces > 0:
@@ -1357,7 +1354,8 @@ def capture_otbn_vertical_batch(ot, ktp, capture_cfg, scope_type):
 
             # Check the number of cycles where the trigger signal was high.
             cycles = ot.scope.adc.trig_count // scope.num_segments_actual
-            tqdm.write("Observed average number of cycles for batch: %d" % cycles)
+            if (rem_num_traces <= scope.num_segments_max):
+                tqdm.write("No. of cycles with trigger high: %d" % cycles)
 
             seeds = []
             masks = []
@@ -1392,9 +1390,8 @@ def capture_otbn_vertical_batch(ot, ktp, capture_cfg, scope_type):
                 d1 = mask % mod
 
                 # calculate batch digest
-                out = d0 #^ d1 #bytes(a ^ b for (a, b) in zip(d0, d1))
-                batch_digest = (out if batch_digest is None else
-                                out ^ batch_digest) #bytes(a ^ b for (a, b) in zip(out, batch_digest)))
+                batch_digest = (d0 if batch_digest is None else
+                                d0 ^ batch_digest)
                 
                 seeds.append(seed_barray)
                 d0s.append(bytearray(d0.to_bytes(seed_bytes, "little")))
@@ -1423,34 +1420,9 @@ def capture_otbn_vertical_batch(ot, ktp, capture_cfg, scope_type):
         project.traces.tm.setTraceSegmentStatus(s, True)
     assert len(project.traces) == capture_cfg["num_traces"]
 
-    print(" ")
-    print("project.keys before project.save():")
-    for i in project.keys:
-        print(binascii.b2a_hex(i))
-    print("project.traces.key before project.save():")
-    for t in project.traces:
-        print(binascii.b2a_hex(t.key))
     # Save the project to disk.
-    print("\nsaving project...")
     project.save()
-    print("\nproject.keys after project.save() and before project.close():")
-    for i in project.keys:
-        print(binascii.b2a_hex(i))
-    print("project.traces.key after project.save() and before project.close():")
-    for t in project.traces:
-        print(binascii.b2a_hex(t.key))
 
-    print("\nclosing project...")
-    project.close()
-    print("opening project...")
-    project = cw.open_project(capture_cfg["project_name"] + ".cwp")
-
-    print("\nproject.keys after project.close() and cw.open_project():")
-    for i in project.keys:
-        print(binascii.b2a_hex(i))
-    print("project.traces.key after project.close() and cw.open_project():")
-    for t in project.traces:
-        print(binascii.b2a_hex(t.key))
 
 @app_capture.command()
 def otbn_vertical_batch(ctx: typer.Context,
