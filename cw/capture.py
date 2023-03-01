@@ -612,6 +612,8 @@ def capture_sha3_fvsr_data_batch(ot, ktp, capture_cfg, scope_type):
 
     plaintext_fixed = bytearray([0x81, 0x1E, 0x37, 0x31, 0xB0, 0x12, 0x0A, 0x78,
                                  0x42, 0x78, 0x1E, 0x22, 0xB2, 0x5C, 0xDD, 0xF9])
+    plaintext_fixed = bytearray([0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+                                 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00])
     ot.target.simpleserial_write("t", plaintext_fixed)
 
     plaintext = plaintext_fixed
@@ -834,6 +836,8 @@ def capture_kmac_fvsr_key_batch(ot, ktp, capture_cfg, scope_type):
 
     key_fixed = bytearray([0x81, 0x1E, 0x37, 0x31, 0xB0, 0x12, 0x0A, 0x78,
                            0x42, 0x78, 0x1E, 0x22, 0xB2, 0x5C, 0xDD, 0xF9])
+    key_fixed = bytearray([0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+                            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00])
     ot.target.simpleserial_write("t", key_fixed)
     key = key_fixed
     random.seed(capture_cfg["batch_prng_seed"])
@@ -1073,7 +1077,12 @@ def capture_otbn_vertical(ot, ktp, fw_bin, pll_frequency, capture_cfg):
 
     # Seed the RNG and generate a random fixed seed for all traces of the
     # keygen operation.
-    seed_fixed = ktp.next_key()
+    #seed_fixed = ktp.next_key()
+    seed_fixed = bytearray([0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+                            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+                            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
     print(f'fixed seed = {seed_fixed.hex()}')
     if len(seed_fixed) != seed_bytes:
         raise ValueError(f'Fixed seed length is {len(seed_fixed)}, expected {seed_bytes}')
@@ -1288,28 +1297,30 @@ def capture_otbn_vertical_batch(ot, ktp, capture_cfg, scope_type):
 
     # set ecc256 fixed seed - for batch mode the "plaintext" of ktp is used for seed and mask
     # this simplifies synchronization with the device PRNG
-    seed_fixed = ktp.next()[1]
+    #seed_fixed = ktp.next()[1]
+    seed_fixed = bytearray([0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+                            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+                            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
     print("Fixed seed:")
     print(binascii.b2a_hex(seed_fixed))
     if len(seed_fixed) != seed_bytes:
         raise ValueError(f'Fixed seed length is {len(seed_fixed)}, expected {seed_bytes}')
     ot.target.simpleserial_write("x", seed_fixed)
-    time.sleep(1)
+    time.sleep(0.5)
 
     # set PRNG seed
     random.seed(capture_cfg["batch_prng_seed"])
     ot.target.simpleserial_write("s", capture_cfg["batch_prng_seed"].to_bytes(4, "little"))
-    time.sleep(1)
+    time.sleep(0.5)
 
     # enable/disable masking
     if capture_cfg["masks_off"] == True:
         ot.target.simpleserial_write("m", bytearray([0x00]))
     else:
         ot.target.simpleserial_write("m", bytearray([0x01]))
-    time.sleep(1)
-
-    # Create the ChipWhisperer project.
-    project = cw.create_project(capture_cfg["project_name"], overwrite=True)
+    time.sleep(0.5)
 
     # Capture traces.
     rem_num_traces = capture_cfg["num_traces"]
@@ -1344,6 +1355,10 @@ def capture_otbn_vertical_batch(ot, ktp, capture_cfg, scope_type):
             waves = scope.capture_and_transfer_waves()
             assert waves.shape[0] == scope.num_segments
 
+            # Check the number of cycles where the trigger signal was high.
+            cycles = ot.scope.adc.trig_count // scope.num_segments_actual
+            tqdm.write("Observed average number of cycles for batch: %d" % cycles)
+
             seeds = []
             masks = []
             d0s = []
@@ -1377,7 +1392,7 @@ def capture_otbn_vertical_batch(ot, ktp, capture_cfg, scope_type):
                 batch_digest = (out if batch_digest is None else
                                 out ^ batch_digest) #bytes(a ^ b for (a, b) in zip(out, batch_digest)))
                 
-                seeds.append(seed)
+                seeds.append(seed.to_bytes(seed_bytes, "little"))
                 d0s.append(d0.to_bytes(seed_bytes, "little"))
                 d1s.append(d1.to_bytes(seed_bytes, "little"))
                 sample_fixed = dummy[0] & 1
@@ -1387,10 +1402,13 @@ def capture_otbn_vertical_batch(ot, ktp, capture_cfg, scope_type):
 
             num_segments_storage = optimize_cw_capture(project, num_segments_storage)
 
-            # Add traces of this batch to the project.
+            # Create a chipwhisperer trace object and save it to the project
+            # Args/fields of Trace object: waves, textin, textout, key
             for wave, seed, mask, d0, d1 in zip(waves, seeds, masks, d0s, d1s):
+                d = d0 + d1
+                trace = cw.common.traces.Trace(wave, d, mask, seed)
                 project.traces.append(
-                    cw.common.traces.Trace(wave, seed, mask, (d0 + d1)),
+                    trace,
                     dtype=np.uint16
                 )
             # Update the loop variable and the progress bar.
@@ -1400,9 +1418,35 @@ def capture_otbn_vertical_batch(ot, ktp, capture_cfg, scope_type):
     for s in range(len(project.segments)):
         project.traces.tm.setTraceSegmentStatus(s, True)
     assert len(project.traces) == capture_cfg["num_traces"]
-    # Save the project to disk.
-    project.save()
 
+    print(" ")
+    print("project.keys before project.save():")
+    for i in project.keys:
+        print(binascii.b2a_hex(i))
+    print("project.traces.key before project.save():")
+    for t in project.traces:
+        print(binascii.b2a_hex(t.key))
+    # Save the project to disk.
+    print("\nsaving project...")
+    project.save()
+    print("\nproject.keys after project.save() and before project.close():")
+    for i in project.keys:
+        print(binascii.b2a_hex(i))
+    print("project.traces.key after project.save() and before project.close():")
+    for t in project.traces:
+        print(binascii.b2a_hex(t.key))
+
+    print("\nclosing project...")
+    project.close()
+    print("opening project...")
+    project = cw.open_project(capture_cfg["project_name"] + ".cwp")
+
+    print("\nproject.keys after project.close() and cw.open_project():")
+    for i in project.keys:
+        print(binascii.b2a_hex(i))
+    print("project.traces.key after project.close() and cw.open_project():")
+    for t in project.traces:
+        print(binascii.b2a_hex(t.key))
 
 @app_capture.command()
 def otbn_vertical_batch(ctx: typer.Context,

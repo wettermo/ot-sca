@@ -3,6 +3,7 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
+import binascii
 import inspect
 import logging as log
 import multiprocessing
@@ -433,6 +434,9 @@ def run_tvla(ctx: typer.Context):
 
         # Make sure the project file is compatible with the previously generated histograms.
         project = cw.open_project(cfg["project_file"])
+        print("project.keys after cw.open_project()")
+        for y in project.keys:
+            print(binascii.b2a_hex(y))
         if cfg["input_file"] is None:
             num_samples = len(project.waves[0])
         else:
@@ -636,10 +640,10 @@ def run_tvla(ctx: typer.Context):
                         # In addition, for some existing trace sets the fixed key is used for the
                         # second instead of the first trace. For compatibility, compare a couple of
                         # keys and then select the fixed one. Eventually, we can drop this.
-                        for i_key in range(10):
+                        for i_key in range(6):
                             fixed_key = keys_nparrays[i_key]
                             num_hits = 0
-                            for i in range(10):
+                            for i in range(6):
                                 num_hits += np.array_equal(fixed_key, keys_nparrays[i])
                             if num_hits > 1:
                                 break
