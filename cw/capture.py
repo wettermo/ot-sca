@@ -1368,15 +1368,19 @@ def capture_otbn_vertical_batch(ot, ktp, capture_cfg, scope_type):
             for i in range(scope.num_segments_actual):
 
                 if sample_fixed:
-                    seed = int.from_bytes(seed_fixed, "little")
+                    seed_barray = seed_fixed
+                    seed = int.from_bytes(seed_barray, "little")
                 else:
-                    seed = int.from_bytes(ktp.next()[1], "little")
+                    seed_barray = ktp.next()[1]
+                    seed = int.from_bytes(seed_barray, "little")
                 
                 if capture_cfg["masks_off"] == True:
-                    mask = int.from_bytes(bytearray(capture_cfg["plain_text_len_bytes"]), "little")
+                    mask_barray = bytearray(capture_cfg["plain_text_len_bytes"])
+                    mask = int.from_bytes(mask_barray, "little")
                 else:
-                    mask = int.from_bytes(ktp.next()[1], "little")
-                masks.append(mask.to_bytes(seed_bytes, "little"))
+                    mask_barray = ktp.next()[1]
+                    mask = int.from_bytes(mask_barray, "little")
+                masks.append(mask_barray)
                 seed = seed ^ mask
 
                 # needed to be in sync with ot PRNG and for sample_fixed generation
@@ -1392,13 +1396,13 @@ def capture_otbn_vertical_batch(ot, ktp, capture_cfg, scope_type):
                 batch_digest = (out if batch_digest is None else
                                 out ^ batch_digest) #bytes(a ^ b for (a, b) in zip(out, batch_digest)))
                 
-                seeds.append(seed.to_bytes(seed_bytes, "little"))
-                d0s.append(d0.to_bytes(seed_bytes, "little"))
-                d1s.append(d1.to_bytes(seed_bytes, "little"))
+                seeds.append(seed_barray)
+                d0s.append(bytearray(d0.to_bytes(seed_bytes, "little")))
+                d1s.append(bytearray(d1.to_bytes(seed_bytes, "little")))
                 sample_fixed = dummy[0] & 1
 
             # Check the batch digest to make sure we are in sync.
-            check_ciphertext(ot, batch_digest.to_bytes(seed_bytes, "little"), seed_bytes)
+            check_ciphertext(ot, bytearray(batch_digest.to_bytes(seed_bytes, "little")), seed_bytes)
 
             num_segments_storage = optimize_cw_capture(project, num_segments_storage)
 
