@@ -14,7 +14,7 @@ capture:
   use_fixed_key_iter: False # See https://github.com/lowRISC/ot-sca/issues/116
   key_len_bytes: 40
   plain_text_len_bytes: 40
-  masks_off: true
+  masks_off: false
   # Output length (most likely unused).
   output_len_bytes: 40
   # Samples per trace
@@ -24,7 +24,7 @@ capture:
   offset: 0
   # scope gain in db
   scope_gain: 24
-  num_traces: 1000
+  num_traces: 100000
   batch_prng_seed: 6
   project_name: projects/opentitan_otbn_vertical_keygen
   waverunner_ip: 192.168.1.228
