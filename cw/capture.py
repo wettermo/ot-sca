@@ -1081,7 +1081,7 @@ def capture_otbn_vertical(ot, ktp, fw_bin, pll_frequency, capture_cfg):
     # Initialize some curve-dependent parameters.
     if capture_cfg["curve"] == 'p256':
         curve_order_n = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
-        # key_bytes = 256 // 8
+        key_bytes = 256 // 8
         seed_bytes = 320 // 8
     else:
         # TODO: add support for P384
@@ -1096,16 +1096,29 @@ def capture_otbn_vertical(ot, ktp, fw_bin, pll_frequency, capture_cfg):
         raise ValueError(f'Unexpected mask length: {ktp.textLen()}.\n'
                          f'Hint: set plaintext len={seed_bytes} in the configuration file.')
 
-    # Seed the RNG and generate a random fixed seed for all traces of the
-    # keygen operation.
-    seed_fixed = ktp.next_key()
-    print(f'fixed seed = {seed_fixed.hex()}')
-    if len(seed_fixed) != seed_bytes:
-        raise ValueError(f'Fixed seed length is {len(seed_fixed)}, expected {seed_bytes}')
+    # Modify to select fixed vs. random approach
+    # 1: directly generate shares
+    # 3: generate shares from a given key
+    keygen_option = 3
 
-    # Expected key is `seed mod n`, where n is the order of the curve and
-    # `seed` is interpreted as little-endian.
-    expected_fixed_key = int.from_bytes(seed_fixed, byteorder='little') % curve_order_n
+    if keygen_option == 1:
+        # Seed the RNG and generate a random fixed seed for all traces of the
+        # keygen operation.
+        seed_fixed = ktp.next_key()
+        print(f'fixed seed = {seed_fixed.hex()}')
+        if len(seed_fixed) != seed_bytes:
+            raise ValueError(f'Fixed seed length is {len(seed_fixed)}, expected {seed_bytes}')
+
+        # Expected key is `seed mod n`, where n is the order of the curve and
+        # `seed` is interpreted as little-endian.
+        expected_fixed_key = int.from_bytes(seed_fixed, byteorder='little') % curve_order_n
+    elif keygen_option == 3:
+        # select a 320 bit constant C. It is almost guaranteed that C > curve_order_n
+        C = ktp.next_key()
+        # select a 256 bit constant fixed_key
+        fixed_key = ktp.next_key()[:key_bytes]
+        # Expected key is interpreted as little-endian.
+        expected_fixed_key = int.from_bytes(fixed_key, byteorder='little')
 
     # register ctrl-c handler to not lose already recorded traces if measurement is aborted
     signal.signal(signal.SIGINT, partial(abort_handler, project))
@@ -1120,27 +1133,75 @@ def capture_otbn_vertical(ot, ktp, fw_bin, pll_frequency, capture_cfg):
 
         ot.scope.adc.offset = capture_cfg["offset"]
 
-        if capture_cfg["masks_off"] is True:
-            # Use a constant mask for each trace
-            mask = bytearray(capture_cfg["plain_text_len_bytes"])  # all zeros
-        else:
-            # Generate a new random mask for each trace.
-            mask = ktp.next_text()
+        if keygen_option == 1:
+            if capture_cfg["masks_off"] is True:
+                # Use a constant mask for each trace
+                mask = bytearray(
+                    capture_cfg["plain_text_len_bytes"])  # all zeros
+            else:
+                # Generate a new random mask for each trace.
+                mask = ktp.next_text()
+            if sample_fixed:
+                # Use the fixed seed.
+                seed_used = seed_fixed
+                expected_key = expected_fixed_key
+            else:
+                # Use a random seed.
+                seed_used = ktp.next_key()
+                expected_key = int.from_bytes(seed_used,
+                                              'little') % curve_order_n
 
-        tqdm.write("Starting new trace....")
-        tqdm.write(f'mask   = {mask.hex()}')
-
-        if sample_fixed:
-            # Use the fixed seed.
-            seed_used = seed_fixed
-            expected_key = expected_fixed_key
-        else:
-            # Use a random seed.
-            seed_used = ktp.next_key()
-            expected_key = int.from_bytes(seed_used, byteorder='little') % curve_order_n
+        elif keygen_option == 3:
+            if sample_fixed:
+                # Expected key is (C + fixed_key) % curve_order_n
+                expected_key = (int.from_bytes(C, 'little') +
+                                expected_fixed_key) % curve_order_n
+                if capture_cfg["masks_off"] is True:
+                    # Use a constant mask for each trace
+                    mask = bytearray(
+                        capture_cfg["plain_text_len_bytes"])  # all zeros
+                    # Compute seed = (C + fixed_key)
+                    seed_used_int = int.from_bytes(
+                        C, 'little') + int.from_bytes(fixed_key, 'little')
+                    seed_used = bytearray(
+                        seed_used_int.to_bytes(seed_bytes, 'little'))
+                else:
+                    # Pick a random 320 bit value seed
+                    seed_used = ktp.next_key()
+                    # Compute mask = (C + fixed_key) XOR seed
+                    mask_int = int.from_bytes(C, 'little') + int.from_bytes(
+                        fixed_key, 'little') ^ int.from_bytes(
+                            seed_used, 'little')
+                    mask = bytearray(mask_int.to_bytes(seed_bytes, 'little'))
+            else:
+                # Pick a random 256 bit value random_key
+                random_key = ktp.next_key()[:key_bytes]
+                # Expected key is (C + random_key) % curve_order_n
+                expected_key = (int.from_bytes(C, 'little') + int.from_bytes(
+                    random_key, 'little')) % curve_order_n
+                if capture_cfg["masks_off"] is True:
+                    # Use a constant mask for each trace
+                    mask = bytearray(
+                        capture_cfg["plain_text_len_bytes"])  # all zeros
+                    # Compute seed = (C + random_key)
+                    seed_used_int = int.from_bytes(
+                        C, 'little') + int.from_bytes(random_key, 'little')
+                    seed_used = bytearray(
+                        seed_used_int.to_bytes(seed_bytes, 'little'))
+                else:
+                    # Pick a random 320 bit value seed
+                    seed_used = ktp.next_key()
+                    # Compute mask = (C + random_key) XOR seed
+                    mask_int = int.from_bytes(C, 'little') + int.from_bytes(
+                        random_key, 'little') ^ int.from_bytes(
+                            seed_used, 'little')
+                    mask = bytearray(mask_int.to_bytes(seed_bytes, 'little'))
 
         # Decide for next round if we use the fixed or a random seed.
         sample_fixed = random.randint(0, 1)
+
+        tqdm.write("Starting new trace....")
+        tqdm.write(f'mask   = {mask.hex()}')
 
         ot.target.simpleserial_write('x', seed_used)
         tqdm.write(f'seed   = {seed_used.hex()}')
