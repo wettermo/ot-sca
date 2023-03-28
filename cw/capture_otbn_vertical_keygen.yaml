@@ -1,6 +1,6 @@
 device:
   fpga_bitstream: objs/lowrisc_systems_chip_earlgrey_cw310_0.1_ecdsa.bit
-  fw_bin: objs/ecc256_keygen_serial_fpga_cw310.bin
+  fw_bin: objs/otbn_vertical_serial_fpga_cw310.bin
   # Target operating frequency
   # For non-batch mode max. 91 MHz, otherwise serial communication fails
   pll_frequency: 100000000
@@ -8,6 +8,8 @@ device:
 capture:
   # Currently, 'p256' is the only supported curve.
   curve: p256
+  # Select the OTBN app to analyze. Currently available: 'keygen', 'modinv'
+  app: keygen
   # These byte-lengths are passed to the chipwhisperer key/plaintext generator.
   # Since this is not encryption, they don't correspond to key/plaintext, but
   # rather seed/mask.
