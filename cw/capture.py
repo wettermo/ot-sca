@@ -1296,7 +1296,7 @@ def capture_otbn_vertical(ot, ktp, fw_bin, pll_frequency, capture_cfg, device_cf
                 f'Fixed input len: {len(input_k0_fixed)}/{len(input_k1_fixed)}, ' +
                 f'expected {modinv_share_bytes}')
         # Expected fixed output is `(k)^(-1) mod n`, where n is the curve order n
-        expected_fixed_output = pow(k_fixed, -1, curve_order_n)
+        # expected_fixed_output = pow(k_fixed, -1, curve_order_n)
 
         sample_fixed = 1
         # Loop to collect each power trace
@@ -1314,7 +1314,7 @@ def capture_otbn_vertical(ot, ktp, fw_bin, pll_frequency, capture_cfg, device_cf
                 input_k0_used = input_k0_fixed
                 input_k1_used = input_k1_fixed
                 k_used = k_fixed
-                expected_output = expected_fixed_output
+                # expected_output = expected_fixed_output
             else:
                 # Use a random input.
                 input_k0_used = ktp.next_key()
@@ -1323,7 +1323,7 @@ def capture_otbn_vertical(ot, ktp, fw_bin, pll_frequency, capture_cfg, device_cf
                 k_used = (int.from_bytes(input_k0_used, byteorder='little') +
                           int.from_bytes(input_k1_used,
                                          byteorder='little')) % curve_order_n
-                expected_output = pow(k_used, -1, curve_order_n)
+                # expected_output = pow(k_used, -1, curve_order_n)
 
             tqdm.write(
                 f'k0 = {hex(int.from_bytes(input_k0_used, byteorder="little"))}'
@@ -1363,11 +1363,14 @@ def capture_otbn_vertical(ot, ktp, fw_bin, pll_frequency, capture_cfg, device_cf
                 raise RuntimeError('Modinv device output alpha is none')
 
             # Actual result (kalpha_inv*alpha) mod n:
-            actual_output = int.from_bytes(
-                kalpha_inv, byteorder='little') * int.from_bytes(
-                    alpha, byteorder='little') % curve_order_n
+            # actual_output = int.from_bytes(
+            #     kalpha_inv, byteorder='little') * int.from_bytes(
+            #         alpha, byteorder='little') % curve_order_n
 
-            tqdm.write(f'k  = {hex(actual_output)}\n')
+            actual_output = int.from_bytes(kalpha_inv, byteorder='little')
+            expected_output = (k_used * int.from_bytes(alpha, byteorder='little')) % curve_order_n
+
+            tqdm.write(f'kaplha  = {hex(actual_output)}\n')
 
             if actual_output != expected_output:
                 raise RuntimeError('Bad computed modinv output:\n'

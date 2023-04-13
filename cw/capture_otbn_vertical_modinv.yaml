@@ -22,14 +22,14 @@ capture:
   output_len_bytes: 32
   # Samples per trace
   # Fifo Size is 131070 = max num samples to avoid multiple runs per trace
-  num_samples: 100000
+  num_samples: 5000
   # Offset in samples
   offset: 0
   # scope gain in db
   scope_gain: 22
-  num_traces: 1000
+  num_traces: 10000
   batch_prng_seed: 6
-  project_name: projects/opentitan_otbn_vertical_modinv
+  project_name: projects/opentitan_otbn_vertical_modinv_masking_analysis
   waverunner_ip: 192.168.1.228
   # As OTBN operations are long, we may need to overwrite the following
   # parameters.

@@ -1,4 +1,4 @@
-project_file: projects/opentitan_otbn_vertical_modinv.cwp
+project_file: projects/opentitan_otbn_vertical_modinv_masking_analysis.cwp
 trace_file: null
 trace_start: null
 trace_end: null
@@ -15,4 +15,4 @@ general_test: true
 mode: otbn_modinv
 key_len_bytes: 32
 sample_start: null
-num_samples : 25000
+num_samples : 5000
